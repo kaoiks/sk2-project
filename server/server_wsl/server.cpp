@@ -10,9 +10,13 @@
 #include <netdb.h>
 #include <sys/epoll.h>
 #include <unordered_set>
-#include <list>
+#include <list> 
 #include <signal.h>
+#include <iostream>
+#include "json.hpp"
 
+
+using json = nlohmann::json;
 // Przykład dodatkowo czyta do nowej linii i obsługuje EPOLLOUT
 
 class Client;
@@ -68,22 +72,34 @@ public:
     virtual void handleEvent(uint32_t events) override {
         if(events & EPOLLIN) {
             ssize_t count = read(_fd, readBuffer.dataPos(), readBuffer.remaining());
+            
+
             if(count <= 0)
                 events |= EPOLLERR;
             else {
+                //std::cout << "HERE" << std::endl;
                 readBuffer.pos += count;
                 char * eol = (char*) memchr(readBuffer.data, '\n', readBuffer.pos);
                 if(eol == nullptr) {
+                    //std::cout<< "HEREE" <<std::endl;
                     if(0 == readBuffer.remaining())
                         readBuffer.doube();
                 } else {
                     do {
                         auto thismsglen = eol - readBuffer.data + 1;
+                        
                         sendToAllBut(_fd, readBuffer.data, thismsglen);
                         auto nextmsgslen =  readBuffer.pos - thismsglen;
                         memmove(readBuffer.data, eol+1, nextmsgslen);
                         readBuffer.pos = nextmsgslen;
                     } while((eol = (char*) memchr(readBuffer.data, '\n', readBuffer.pos)));
+                    
+                    std::string messageData(readBuffer.data, strlen(readBuffer.data));
+                    //string without \n at the end
+                    std::string message =  messageData.substr(0,messageData.length()-1);
+                    json data = json::parse(message);
+
+                    std::cout<< data["nickname"].get<std::string>() <<std::endl;
                 }
             }
         }
