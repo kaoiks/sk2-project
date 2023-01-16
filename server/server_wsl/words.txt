@@ -1,0 +1,16 @@
+kangaroo
+monkey
+snake
+zebra
+panda
+hippo
+bull
+elephant
+lion
+antelope
+gorilla
+giraffe
+tiger
+eagle
+ostrich
+vulture

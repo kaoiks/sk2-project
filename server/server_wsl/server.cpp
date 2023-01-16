@@ -14,10 +14,14 @@
 #include <signal.h>
 #include <iostream>
 #include "json.hpp"
+#include <chrono> 
+#include <thread>
+#include <unistd.h>
+#include <fstream>
 
 
 using json = nlohmann::json;
-// Przykład dodatkowo czyta do nowej linii i obsługuje EPOLLOUT
+
 
 class Client;
 
@@ -27,7 +31,16 @@ std::unordered_set<Client*> clients;
 
 void ctrl_c(int);
 
+
 void sendToAllBut(int fd, char * buffer, int count);
+void sendTo(int fd, const char * buffer, int count);
+void setPlayerUsername(int fd, std::string username);
+
+int countPlayers();;
+void sendToAllGameStart();
+void gameLoop();
+bool playGame = true;
+std::string getRandomWord();
 
 uint16_t readPort(char * txt);
 
@@ -38,8 +51,18 @@ struct Handler {
     virtual void handleEvent(uint32_t events) = 0;
 };
 
+
+class Game{
+    std::string status = "";
+    
+    
+};
+
+
+
 class Client : public Handler {
     int _fd;
+    
     struct Buffer {
         Buffer() {data = (char*) malloc(len);}
         Buffer(const char* srcData, ssize_t srcLen) : len(srcLen) {data = (char*) malloc(len); memcpy(data, srcData, len);}
@@ -52,6 +75,9 @@ class Client : public Handler {
         ssize_t len = 32;
         ssize_t pos = 0;
     };
+
+    int points = 0;
+    std::string _username;
     Buffer readBuffer;
     std::list<Buffer> dataToWrite;
     void waitForWrite(bool epollout) {
@@ -63,12 +89,21 @@ public:
         epoll_event ee {EPOLLIN|EPOLLRDHUP, {.ptr=this}};
         epoll_ctl(epollFd, EPOLL_CTL_ADD, _fd, &ee);
     }
+
     virtual ~Client(){
         epoll_ctl(epollFd, EPOLL_CTL_DEL, _fd, nullptr);
         shutdown(_fd, SHUT_RDWR);
         close(_fd);
     }
+
     int fd() const {return _fd;}
+
+    void setUsername(std::string inputName){
+        _username = inputName;
+    }
+
+    std::string username() const {return _username;}
+
     virtual void handleEvent(uint32_t events) override {
         if(events & EPOLLIN) {
             ssize_t count = read(_fd, readBuffer.dataPos(), readBuffer.remaining());
@@ -88,23 +123,59 @@ public:
                     do {
                         auto thismsglen = eol - readBuffer.data + 1;
                         
-                        sendToAllBut(_fd, readBuffer.data, thismsglen);
+                        //sendToAllBut(_fd, readBuffer.data, thismsglen);
                         auto nextmsgslen =  readBuffer.pos - thismsglen;
                         memmove(readBuffer.data, eol+1, nextmsgslen);
                         readBuffer.pos = nextmsgslen;
                     } while((eol = (char*) memchr(readBuffer.data, '\n', readBuffer.pos)));
-                    
-                    std::string messageData(readBuffer.data, strlen(readBuffer.data));
-                    //string without \n at the end
-                    std::string message =  messageData.substr(0,messageData.length()-1);
-                    json data = json::parse(message);
+                    try{
+                        std::string messageData(readBuffer.data, strlen(readBuffer.data));
+                        //std::cout<< messageData <<std::endl;
+                        //string without \n at the end
+                        std::string message =  messageData.substr(0,messageData.length()-1);
+                        json data = json::parse(message);
+                        std::string operationType = data["operation"].get<std::string>();
 
-                    std::cout<< data["nickname"].get<std::string>() <<std::endl;
+                        if (operationType == "SET_NAME"){
+                            
+                            std::string userNickname = data["username"].get<std::string>();
+                            auto it = clients.begin();
+                            bool exists = false;
+                            while(it!=clients.end()){
+                                Client * client = *it;
+                                it++;
+                                if(client->username() == userNickname){
+                                    //client->write(buffer, count);
+                                    exists = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (exists){
+                                std::string response = "{\"response\":0}";
+                                sendTo(_fd, response.c_str(), response.size());
+                                std::cout<< "Username can't be accepted" <<std::endl;
+                            }
+                            else{
+
+                                setPlayerUsername(_fd, userNickname);
+                                std::string response = "{\"response\":1}";
+                                sendTo(_fd, response.c_str(), response.size());
+                                std::cout<< "Username accepted" <<std::endl;
+                            }
+                        }
+                    }
+                    catch(...){
+
+                    }
+
+                    //sendTo
                 }
             }
         }
         if(events & EPOLLOUT) {
             do {
+                
                 int remaining = dataToWrite.front().remaining();
                 int sent = send(_fd, dataToWrite.front().data+dataToWrite.front().pos, remaining, MSG_DONTWAIT);
                 if(sent == remaining) {
@@ -125,7 +196,8 @@ public:
             remove();
         }
     }
-    void write(char * buffer, int count) {
+
+    void write(const char * buffer, int count) {
         if(dataToWrite.size() != 0) {
             dataToWrite.emplace_back(buffer, count);
             return;
@@ -195,20 +267,72 @@ int main(int argc, char ** argv){
     
     epoll_event ee {EPOLLIN, {.ptr=&servHandler}};
     epoll_ctl(epollFd, EPOLL_CTL_ADD, servFd, &ee);
-    
+    std::thread t1(gameLoop);
     while(true){
-        if(-1 == epoll_wait(epollFd, &ee, 1, -1) && errno!=EINTR) {
-            error(0,errno,"epoll_wait failed");
-            ctrl_c(SIGINT);
+        try{
+            if(-1 == epoll_wait(epollFd, &ee, 1, -1) && errno!=EINTR) {
+                
+                error(0,errno,"epoll_wait failed");
+                ctrl_c(SIGINT);
+                playGame = false;
+            }
+            
+            
+
+            ((Handler*)ee.data.ptr)->handleEvent(ee.events);
         }
-        ((Handler*)ee.data.ptr)->handleEvent(ee.events);
-    }
+        catch(...){
+            
+        }
+    }  
+    playGame = false;
+    t1.join();
 }
+
+
+void gameLoop(){
+    bool counter = false;
+    bool inGame = false;
+    auto start = std::chrono::steady_clock::now();
+    while(true){
+        //std::cout<< clients.size() << std::endl;
+        if (countPlayers() > 0){
+                if (!counter && !inGame){
+                    start = std::chrono::steady_clock::now();
+                    std::cout<< "Starting game in 10 seconds"<<std::endl;
+                    counter = true;
+                    usleep(1000000);
+                    sendToAllGameStart();
+                    continue;
+                }
+                else if(counter && !inGame){
+                    if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count() > 10000){
+                        std::cout<< "Game has been started"<<std::endl;
+                        inGame = true;
+                        counter = false;
+                    }
+                    continue;
+                }
+                else if(inGame){
+                    std::cout<< "IN GAME"<<std::endl;
+                    std::string word = getRandomWord(); 
+                    std::cout<< word <<std::endl;
+
+                    while(true){
+
+                    }
+                }
+        }
+    }
+    
+}
+
+
 
 uint16_t readPort(char * txt){
     char * ptr;
     auto port = strtol(txt, &ptr, 10);
-    if(*ptr!=0 || port<1 || (port>((1<<16)-1))) error(1,0,"illegal argument %s", txt);
+    if(*ptr!=0 || port<1 || (port>((1<<16)-1))) error(1, 0, "illegal argument %s", txt);
     return port;
 }
 
@@ -234,4 +358,62 @@ void sendToAllBut(int fd, char * buffer, int count){
         if(client->fd()!=fd)
             client->write(buffer, count);
     }
+}
+
+int countPlayers(){
+    auto it = clients.begin();
+    int counter = 0;
+    while(it!=clients.end()){
+        Client * client = *it;
+        it++;
+        if(client->username().empty()){
+        }
+        else{
+            ++counter;
+        }  
+    }
+    return counter;
+}
+
+
+void sendTo(int fd, const char * buffer, int count){
+    auto it = clients.begin();
+    while(it!=clients.end()){
+        Client * client = *it;
+        it++;
+        if(client->fd() == fd)
+            client->write(buffer, count);
+    }
+}
+
+void setPlayerUsername(int fd, std::string username){
+    auto it = clients.begin();
+    while(it!=clients.end()){
+        Client * client = *it;
+        it++;
+        if(client->fd() == fd){
+            client->setUsername(username);
+        }
+    }
+}
+
+void sendToAllGameStart(){
+    std::string payload = "{\"message\":\"10_SECOND_ALERT\"}";
+
+    auto it = clients.begin();
+    while(it!=clients.end()){
+        Client * client = *it;
+        it++;
+        client->write(payload.c_str(), payload.size());
+    }
+}
+
+
+std::string getRandomWord(){
+    std::vector<std::string> words;
+    std::ifstream file("words.txt");
+    for (std::string line; std::getline(file, line); words.push_back(line)) {}
+    int random = rand() % words.size();
+    std::string selected_word = words[random];
+    return selected_word;
 }
