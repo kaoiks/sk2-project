@@ -18,7 +18,8 @@
 #include <thread>
 #include <unistd.h>
 #include <fstream>
-
+#include <algorithm>
+#include<iterator>
 
 using json = nlohmann::json;
 
@@ -29,19 +30,29 @@ int servFd;
 int epollFd;
 std::unordered_set<Client*> clients;
 
+std::vector<std::string> playersInGame;
+json gameRanking;
+bool counter = false;
+bool inGame = false;
+
 void ctrl_c(int);
 
-
+int MIN_PLAYERS = 2;
 void sendToAllBut(int fd, char * buffer, int count);
 void sendTo(int fd, const char * buffer, int count);
 void setPlayerUsername(int fd, std::string username);
-
-int countPlayers();;
+void sendToAllGameStarted();
+std::vector<std::string> playersNames();
+int countPlayers();
 void sendToAllGameStart();
+void sendToAllLobby();
 void gameLoop();
+void sendToPlayersRoundInfo(int round, std::string word, std::vector<std::string> playersInGame);
 bool playGame = true;
 std::string getRandomWord();
-
+void newRanking();
+void updateRanking(std::string username, int points);
+int guessedInCurrentRound = 0;
 uint16_t readPort(char * txt);
 
 void setReuseAddr(int sock);
@@ -130,7 +141,7 @@ public:
                     } while((eol = (char*) memchr(readBuffer.data, '\n', readBuffer.pos)));
                     try{
                         std::string messageData(readBuffer.data, strlen(readBuffer.data));
-                        //std::cout<< messageData <<std::endl;
+                        std::cout<< messageData <<std::endl;
                         //string without \n at the end
                         std::string message =  messageData.substr(0,messageData.length()-1);
                         json data = json::parse(message);
@@ -163,6 +174,15 @@ public:
                                 sendTo(_fd, response.c_str(), response.size());
                                 std::cout<< "Username accepted" <<std::endl;
                             }
+                        }
+                        else if (operationType == "GUESSED"){
+                            std::string nickname = data["username"].get<std::string>();
+                            ++guessedInCurrentRound;
+                            std::cout<< "GUESSED"<< std::endl;
+                            updateRanking(nickname, countPlayers() - guessedInCurrentRound);
+                        }
+                        else if (operationType == "NOT_GUESSED"){
+
                         }
                     }
                     catch(...){
@@ -291,22 +311,21 @@ int main(int argc, char ** argv){
 
 
 void gameLoop(){
-    bool counter = false;
-    bool inGame = false;
     auto start = std::chrono::steady_clock::now();
+    auto game_status_timer = std::chrono::steady_clock::now();
     while(true){
-        //std::cout<< clients.size() << std::endl;
-        if (countPlayers() > 0){
+        
+        if (countPlayers() >= MIN_PLAYERS){
                 if (!counter && !inGame){
                     start = std::chrono::steady_clock::now();
                     std::cout<< "Starting game in 10 seconds"<<std::endl;
                     counter = true;
-                    usleep(1000000);
+                    usleep(500000);
                     sendToAllGameStart();
                     continue;
                 }
                 else if(counter && !inGame){
-                    if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count() > 10000){
+                    if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count() > 5000){
                         std::cout<< "Game has been started"<<std::endl;
                         inGame = true;
                         counter = false;
@@ -314,19 +333,93 @@ void gameLoop(){
                     continue;
                 }
                 else if(inGame){
+                    
                     std::cout<< "IN GAME"<<std::endl;
-                    std::string word = getRandomWord(); 
+                    sendToAllGameStarted();
+                    std::string word = getRandomWord();
+                    std::transform(word.begin(), word.end(), word.begin(), ::toupper);
                     std::cout<< word <<std::endl;
-
+                    playersInGame.clear();
+                    std::vector<std::string> getNames = playersNames();
+                    std::copy(getNames.begin(), getNames.end(), std::back_inserter(playersInGame));
+                    newRanking();
+                    
+                    int round = 1;
+                    guessedInCurrentRound = 0;
+                    sendToPlayersRoundInfo(round, word, playersInGame);
+                    auto round_timer = std::chrono::steady_clock::now();
                     while(true){
-
+                        if (countPlayers() < MIN_PLAYERS){
+                            counter = false;
+                            inGame = false;
+                            std::cout<< "GETTING BACK TO LOBBY"<<std::endl;
+                            break;
+                        }
+                        else{
+                            if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - round_timer).count() > 45000){
+                                if (round < 5){
+                                    std::cout << "ROUND END" <<std::endl;
+                                    ++round;
+                                    word = getRandomWord();
+                                    std::transform(word.begin(), word.end(), word.begin(), ::toupper);
+                                    guessedInCurrentRound = 0;
+                                    sendToPlayersRoundInfo(round, word, playersInGame);
+                                    round_timer = std::chrono::steady_clock::now();
+                                }
+                                else{
+                                    counter = false;
+                                    inGame = false;
+                                    std::cout<< "BACK TO LOBBY"<<std::endl;
+                                    break;
+                                }
+                                }
+                            }
                     }
                 }
+        if (countPlayers() < MIN_PLAYERS){
+            if (inGame){
+                counter = false;
+                inGame = false;
+                std::cout<< "BACK TO LOBBY"<<std::endl;
+            }
+            else{
+                guessedInCurrentRound = 0;
+                if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - game_status_timer).count() > 5000){
+                        std::cout<< "STILL LOBBY"<<std::endl;
+                        //sendToAllLobby();
+                        game_status_timer = std::chrono::steady_clock::now();
+                    }
+            }
+
         }
     }
     
 }
 
+}
+
+void newRanking(){
+    gameRanking.clear();
+    for(std::string player : playersInGame ){
+        gameRanking[player] = 0;
+    }
+}
+
+void updateRanking(std::string username, int points){
+    gameRanking[username] = gameRanking[username].get<int>() + points;
+    std::cout<< gameRanking.dump() << std::endl;
+}
+
+std::vector<std::string> playersNames(){
+    std::vector<std::string> playersInGame;
+    auto it = clients.begin();
+    while(it!=clients.end()){
+        Client * client = *it;
+        it++;
+        playersInGame.push_back(client->username());
+    }
+    return playersInGame;
+}
 
 
 uint16_t readPort(char * txt){
@@ -398,7 +491,7 @@ void setPlayerUsername(int fd, std::string username){
 }
 
 void sendToAllGameStart(){
-    std::string payload = "{\"message\":\"10_SECOND_ALERT\"}";
+    std::string payload = "{\"message\":\"10_SECOND_ALERT\"}\n";
 
     auto it = clients.begin();
     while(it!=clients.end()){
@@ -406,6 +499,51 @@ void sendToAllGameStart(){
         it++;
         client->write(payload.c_str(), payload.size());
     }
+}
+
+void sendToAllGameStarted(){
+    std::string payload = "{\"message\":\"IN_GAME\"}\n";
+
+    auto it = clients.begin();
+    while(it!=clients.end()){
+        Client * client = *it;
+        it++;
+        client->write(payload.c_str(), payload.size());
+    }
+}
+
+void sendToAllLobby(){
+    std::string payload = "{\"message\":\"IN_LOBBY\"}\n";
+    //std::cout << "STILL IN LOBBY" << std::endl;
+    auto it = clients.begin();
+    while(it!=clients.end()){
+        Client * client = *it;
+        it++;
+        client->write(payload.c_str(), payload.size());
+    }
+}
+
+void sendToPlayersRoundInfo(int round, std::string word,std::vector<std::string> playersInGame){
+    json payload;
+    payload["message"] = "GAME_STATUS";
+    payload["round"] = round;
+    word.pop_back();
+    payload["word"] = word;
+    payload["ranking"] = gameRanking;
+    
+    std::string payload_string = payload.dump() + "\n"; 
+    auto it = clients.begin();
+    while(it!=clients.end()){
+        Client * client = *it;
+        it++;
+        
+        if (std::find(playersInGame.begin(), playersInGame.end(), client->username()) != playersInGame.end()) {
+            client->write(payload_string.c_str(), payload_string.size());
+        }
+        else{
+
+        }
+    }   
 }
 
 

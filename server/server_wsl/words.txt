@@ -14,3 +14,152 @@ tiger
 eagle
 ostrich
 vulture
+Aardvark
+Aardwolf
+Abyssinian
+Acadian Flycatcher
+Achrioptera Manga
+Ackie Monitor
+Addax
+Adelie Penguin
+Aesculapian snake
+Affenpinscher
+African Golden Cat
+African Grey Parrot
+African Jacana
+African Palm Civet
+African Penguin
+African Tree Toad
+African Wild Dog
+Agama Lizard
+Aidi
+Ainu
+Airedale Terrier
+Airedoodle
+Akbash
+Akita
+Akita Shepherd
+Alaskan Husky
+Alaskan Klee Kai
+Alaskan Malamute
+Alaskan Pollock
+Alaskan Shepherd
+Albacore Tuna
+Albatross
+Albertonectes
+Alligator Gar
+Allosaurus
+Allosaurus
+Alpaca
+Alpine Dachsbracke
+Alpine Goat
+Alusky
+Amano Shrimp
+Amargasaurus
+Amazon Parrot
+Amazon Tree Boa
+Ambrosia Beetle
+American Alligator
+American Alsatian
+American Bulldog
+American Bully
+American Cockroach
+American Coonhound
+American Dog Tick
+American Eel
+American Eskimo Dog
+American Foxhound
+American Leopard Hound
+American Paddlefish
+American Pugabull
+American Pygmy Goat
+American Robin
+American Toad
+American Wirehair
+Amethystine Python
+Amur Leopard
+Anaconda
+Anatolian Shepherd Dog
+Anchovies
+Andrewsarchus
+Angelfish
+Angelshark
+Anglerfish
+Angora Ferret
+Angora Goat
+Anhinga
+Anna’s Hummingbird
+Anole Lizard
+Anomalocaris
+Ant
+Antarctic scale worm
+Anteater
+Antelope
+Anteosaurus
+Ape
+Apennine Wolf
+Appenzeller Dog
+Apple Head Chihuahua
+Apple Moth
+Arabian Cobra
+Arabian Wolf
+Arafura File Snake
+Arambourgiania
+Arapaima
+Archaeoindris
+Archaeopteryx
+Archaeotherium
+Archelon Turtle
+Archerfish
+Arctic Char
+Arctic Fox
+Arctic Hare
+Arctic Wolf
+Arctodus
+Arctotherium
+Argentavis Magnificens
+Argentinosaurus
+Arizona Coral Snake
+Armadillo
+Armadillo Lizard
+Armenian Gampr
+Armored Catfish
+Armyworm
+Arsinoitherium
+Arthropleura
+Aruba Rattlesnake
+Asian Arowana
+Asian Carp
+Asian Cockroach
+Asian Elephant
+Asian Giant Hornet
+Asian Lady Beetle
+Asian Longhorn Beetle
+Asian Palm Civet
+Asian Vine Snake
+Asian Water Monitor
+Asiatic Black Bear
+Asp
+Assassin Bug
+Assassin Snail
+Atlantic Salmon
+Atlantic Sturgeon
+Atlas Beetle
+Atlas Moth
+Aurochs
+Aussiedoodle
+Aussiedor
+Aussiepom
+Australian Bulldog
+Australian Cockroach
+Australian Gecko
+Australian Mist
+Australian Retriever
+Australian Shepherd
+Australian Terrier
+Australopithecus
+Avocet
+Axolotl
+Ayam Cemani
+Aye-aye
+Azawakh
