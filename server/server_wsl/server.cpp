@@ -366,6 +366,7 @@ void gameLoop(){
                     
                     int round = 1;
                     guessedInCurrentRound = 0;
+                    notGuessedInCurrentRound = 0;
                     sendToPlayersRoundInfo(round, word, playersInGame);
                     auto round_timer = std::chrono::steady_clock::now();
                     while(true){
