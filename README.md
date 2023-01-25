@@ -1,4 +1,4 @@
 # Hangman Game
-Project for Computer Networks laboratory implementing c++ based socket server and simple GUI in python [Dear PyGui](https://github.com/hoffstadt/DearPyGui).
+Project for Computer Networks laboratory implementing c++ based socket server and simple GUI in python [PySimpleGUI](https://www.pysimplegui.org/en/latest/).
 
 
