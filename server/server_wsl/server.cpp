@@ -19,7 +19,8 @@
 #include <unistd.h>
 #include <fstream>
 #include <algorithm>
-#include<iterator>
+#include <iterator>
+#include <cstdlib>
 
 using json = nlohmann::json;
 
@@ -40,6 +41,7 @@ void ctrl_c(int);
 int MIN_PLAYERS = 2;
 void sendToAllBut(int fd, char * buffer, int count);
 void sendTo(int fd, const char * buffer, int count);
+
 void setPlayerUsername(int fd, std::string username);
 void sendToAllGameStarted();
 std::vector<std::string> playersNames();
@@ -53,6 +55,7 @@ std::string getRandomWord();
 void newRanking();
 void updateRanking(std::string username, int points);
 int guessedInCurrentRound = 0;
+int notGuessedInCurrentRound = 0;
 uint16_t readPort(char * txt);
 
 void setReuseAddr(int sock);
@@ -182,6 +185,14 @@ public:
                                 sendTo(_fd, response.c_str(), response.size());
                                 std::cout<< "Username accepted" <<std::endl;
                             }
+                            if (inGame && gameRanking[userNickname] == nullptr){
+                                std::cout<< "PLAYER JOINING EXISTING GAME" <<std::endl;
+                                gameRanking[userNickname] = 0;
+                                playersInGame.push_back(userNickname);
+                            }
+                            else if(inGame) {
+                                std::cout<< "PLAYER REJOINED THE GAME" <<std::endl;
+                            }
                         }
                         else if (operationType == "GUESSED"){
                             std::string nickname = data["username"].get<std::string>();
@@ -190,7 +201,8 @@ public:
                             updateRanking(nickname, countPlayers() - guessedInCurrentRound);
                         }
                         else if (operationType == "NOT_GUESSED"){
-
+                            ++notGuessedInCurrentRound;
+                            
                         }
                     }
                     catch(...){
@@ -275,7 +287,7 @@ class : public Handler {
 int main(int argc, char ** argv){
     if(argc != 2) error(1, 0, "Need 1 arg (port)");
     auto port = readPort(argv[1]);
-    
+    srand(time(0));
     servFd = socket(AF_INET, SOCK_STREAM, 0);
     if(servFd == -1) error(1, errno, "socket failed");
     
@@ -365,13 +377,14 @@ void gameLoop(){
                             break;
                         }
                         else{
-                            if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - round_timer).count() > 45000){
+                            if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - round_timer).count() > 45000 || countPlayers() == (guessedInCurrentRound + notGuessedInCurrentRound)){
                                 if (round < 5){
                                     std::cout << "ROUND END" <<std::endl;
                                     ++round;
                                     word = getRandomWord();
                                     std::transform(word.begin(), word.end(), word.begin(), ::toupper);
                                     guessedInCurrentRound = 0;
+                                    notGuessedInCurrentRound = 0;
                                     sendToPlayersRoundInfo(round, word, playersInGame);
                                     round_timer = std::chrono::steady_clock::now();
                                 }
@@ -385,6 +398,7 @@ void gameLoop(){
                             }
                     }
                 }
+
         if (countPlayers() < MIN_PLAYERS){
             if (inGame){
                 counter = false;
@@ -560,7 +574,7 @@ std::string getRandomWord(){
     std::vector<std::string> words;
     std::ifstream file("words.txt");
     for (std::string line; std::getline(file, line); words.push_back(line)) {}
-    int random = rand() % words.size();
+    int random = std::rand() % words.size();
     std::string selected_word = words[random];
     return selected_word;
 }
