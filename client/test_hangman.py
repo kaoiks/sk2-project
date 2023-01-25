@@ -103,6 +103,7 @@ class Game:
                     if data['message'] == "IN_GAME":
                         self.window['game_status'].Update("GAME IN PROGRESS")
                     if data['message'] == 'GAME_STATUS':
+                        self.window['game_status'].Update("GAME IN PROGRESS")
                         self.current_round = data['round']
                         self.current_word = data['word']
                         self.game_in_progress = True
