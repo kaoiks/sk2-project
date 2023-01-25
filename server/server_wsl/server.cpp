@@ -139,11 +139,19 @@ public:
                         memmove(readBuffer.data, eol+1, nextmsgslen);
                         readBuffer.pos = nextmsgslen;
                     } while((eol = (char*) memchr(readBuffer.data, '\n', readBuffer.pos)));
+                    //*eol = '\0';
+                    for(size_t i=0; i< strlen(readBuffer.data);++i ){
+                        if (readBuffer.data[i] == '\n'){
+                            readBuffer.data[i] = '\0';
+                            break;
+                        }
+                    }
                     try{
                         std::string messageData(readBuffer.data, strlen(readBuffer.data));
                         std::cout<< messageData <<std::endl;
                         //string without \n at the end
-                        std::string message =  messageData.substr(0,messageData.length()-1);
+                        
+                        std::string message =  messageData.substr(0,messageData.length());
                         json data = json::parse(message);
                         std::string operationType = data["operation"].get<std::string>();
 
@@ -353,6 +361,7 @@ void gameLoop(){
                             counter = false;
                             inGame = false;
                             std::cout<< "GETTING BACK TO LOBBY"<<std::endl;
+                            sendToAllLobby();
                             break;
                         }
                         else{

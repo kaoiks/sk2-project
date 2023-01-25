@@ -90,9 +90,14 @@ class Game:
                         self.accepted_nickname = True
                     else:
                         print("NOT ACCEPTED")
-                        self.accepted_nickname = True  
+                        self.accepted_nickname = False  
                 
                 if 'message' in data:
+                    if data['message'] == 'IN_LOBBY':
+                        self.game_in_progress = False
+                        self.window['ranking_text'].Update("")
+                        self.window['canvas'].TKCanvas.delete("all")
+                        self.window['game_status'].Update("WAITING FOR PLAYERS")
                     if data['message'] == "10_SECOND_ALERT":
                         self.window['game_status'].Update("GAME WILL START IN 10 SECONDS")
                     if data['message'] == "IN_GAME":
@@ -120,7 +125,7 @@ class Game:
                         self.draw_current_canvas()
                     if data['message'] == 'SHOW_RANKING':
                         self.ra
-                        self.game_in_progress = True
+                        self.game_in_progress = False
                         self.guessed_letters.clear()
                         self.guessed_letters.append(' ')
                         self.bad_guesses.clear()
@@ -204,20 +209,10 @@ class Game:
             sg.vtop([col3, col2])
         ]
 
-
-        # canvas = sg.Canvas( width=400, height=300)
-        # canvas.pack()
-
-        # # Draw the gallows
-        # canvas.create_line(100, 250, 300, 250)
-        # canvas.create_line(200, 250, 200, 50)
-        # canvas.create_line(200, 50, 100, 50)
-        # canvas.create_line(100, 50, 100, 75)
         
         window = sg.Window('Hangman Game', layout, element_justification='c', size=(1200, 700), finalize=True)
         self.window = window
 
-        #self.window['canvas'].TKCanvas.create_oval(50, 50, 100, 100, fill='white')
         
 
         while True:
@@ -240,6 +235,7 @@ class Game:
             if event == 'make_guess' and self.game_in_progress and self.lifes > 0 and not self.check_if_win():
                 letter = values['letter_input']
                 window.Element('letter_input').Update("")
+                self.window['letter_input'].set_focus()
                 if letter in self.bad_guesses:
                     continue
                 elif letter in self.guessed_letters:
@@ -257,15 +253,12 @@ class Game:
                     if self.lifes == 0:
                         self.send_not_guessed_info()
                     self.draw_current_canvas()
-            else:
-                if self.lifes == 0:
-                    print("YOU LOST")
-                elif not self.game_in_progress:
-                    print("NOT IN GAME")
+            
 
             if event == sg.WIN_CLOSED:
                 break
         window.Close()
         self.client_socket.close()
         exit(0)
+
 Game().hangman_game()
